@@ -121,8 +121,9 @@ def to_pixel_samples(img):
     """ Convert the image to coord-RGB pairs.
         img: Tensor, (3, H, W)
     """
-    coord = make_coord(img.shape[-2:])
-    rgb = img.view(3, -1).permute(1, 0)
+    coord = make_coord(img.shape[1:])
+    # rgb = img.view(3, -1).permute(1, 0)
+    rgb = img.flatten(1,3).permute(1,0)
     return coord, rgb
 
 

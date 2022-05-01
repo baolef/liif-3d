@@ -1,6 +1,6 @@
 import os
 import json
-from PIL import Image
+# from PIL import Image
 
 import pickle
 import imageio
@@ -10,6 +10,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 from datasets import register
+import ants
 
 
 @register('image-folder')
@@ -50,8 +51,9 @@ class ImageFolder(Dataset):
                 self.files.append(bin_file)
 
             elif cache == 'in_memory':
-                self.files.append(transforms.ToTensor()(
-                    Image.open(file).convert('RGB')))
+                self.files.append(ants.image_read(file))
+                # self.files.append(transforms.ToTensor()(
+                #     Image.open(file).convert('RGB')))
 
     def __len__(self):
         return len(self.files) * self.repeat
@@ -60,7 +62,7 @@ class ImageFolder(Dataset):
         x = self.files[idx % len(self.files)]
 
         if self.cache == 'none':
-            return transforms.ToTensor()(Image.open(x).convert('RGB'))
+            return ants.image_read(x)
 
         elif self.cache == 'bin':
             with open(x, 'rb') as f:
