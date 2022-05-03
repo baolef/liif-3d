@@ -11,7 +11,7 @@ from models import register
 
 
 def default_conv(in_channels, out_channels, kernel_size, bias=True):
-    return nn.Conv2d(
+    return nn.Conv3d(
         in_channels, out_channels, kernel_size,
         padding=(kernel_size//2), bias=bias)
 
@@ -37,7 +37,7 @@ class ResBlock(nn.Module):
         for i in range(2):
             m.append(conv(n_feats, n_feats, kernel_size, bias=bias))
             if bn:
-                m.append(nn.BatchNorm2d(n_feats))
+                m.append(nn.BatchNorm3d(n_feats))
             if i == 0:
                 m.append(act)
 
@@ -59,7 +59,7 @@ class Upsampler(nn.Sequential):
                 m.append(conv(n_feats, 4 * n_feats, 3, bias))
                 m.append(nn.PixelShuffle(2))
                 if bn:
-                    m.append(nn.BatchNorm2d(n_feats))
+                    m.append(nn.BatchNorm3d(n_feats))
                 if act == 'relu':
                     m.append(nn.ReLU(True))
                 elif act == 'prelu':
@@ -69,7 +69,7 @@ class Upsampler(nn.Sequential):
             m.append(conv(n_feats, 9 * n_feats, 3, bias))
             m.append(nn.PixelShuffle(3))
             if bn:
-                m.append(nn.BatchNorm2d(n_feats))
+                m.append(nn.BatchNorm3d(n_feats))
             if act == 'relu':
                 m.append(nn.ReLU(True))
             elif act == 'prelu':
@@ -177,7 +177,7 @@ def make_edsr_baseline(n_resblocks=16, n_feats=64, res_scale=1,
     args.no_upsampling = no_upsampling
 
     args.rgb_range = rgb_range
-    args.n_colors = 3
+    args.n_colors = 1
     return EDSR(args)
 
 

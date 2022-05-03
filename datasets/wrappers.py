@@ -103,7 +103,7 @@ def resize_fn(img, size):
 
 
 def to_tensor(img):
-    img=(img-img.min())/(img.max()-img.min())
+    # img=(img-img.min())/(img.max()-img.min()+1e-10)
     return torch.Tensor(img.numpy(True).transpose(3, 0, 1, 2))
 
 

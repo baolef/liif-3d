@@ -51,7 +51,7 @@ class ImageFolder(Dataset):
                 self.files.append(bin_file)
 
             elif cache == 'in_memory':
-                self.files.append(ants.image_read(file))
+                self.files.append(ants.image_read(file).iMath_normalize())
                 # self.files.append(transforms.ToTensor()(
                 #     Image.open(file).convert('RGB')))
 
@@ -62,7 +62,7 @@ class ImageFolder(Dataset):
         x = self.files[idx % len(self.files)]
 
         if self.cache == 'none':
-            return ants.image_read(x)
+            return ants.image_read(x).iMath_normalize()
 
         elif self.cache == 'bin':
             with open(x, 'rb') as f:

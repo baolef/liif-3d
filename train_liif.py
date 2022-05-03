@@ -49,7 +49,7 @@ def make_data_loader(spec, tag=''):
         log('  {}: shape={}'.format(k, tuple(v.shape)))
 
     loader = DataLoader(dataset, batch_size=spec['batch_size'],
-        shuffle=(tag == 'train'), num_workers=8, pin_memory=True)
+        shuffle=(tag == 'train'), pin_memory=True)
     return loader
 
 
@@ -93,8 +93,8 @@ def train(train_loader, model, optimizer):
 
     data_norm = config['data_norm']
     t = data_norm['inp']
-    inp_sub = torch.FloatTensor(t['sub']).view(1, -1, 1, 1).cuda()
-    inp_div = torch.FloatTensor(t['div']).view(1, -1, 1, 1).cuda()
+    inp_sub = torch.FloatTensor(t['sub']).view(1, -1, 1, 1, 1).cuda()
+    inp_div = torch.FloatTensor(t['div']).view(1, -1, 1, 1, 1).cuda()
     t = data_norm['gt']
     gt_sub = torch.FloatTensor(t['sub']).view(1, 1, -1).cuda()
     gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).cuda()
