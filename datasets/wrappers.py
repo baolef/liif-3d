@@ -27,6 +27,9 @@ class SRImplicitPaired(Dataset):
 
     def __getitem__(self, idx):
         img_lr, img_hr = self.dataset[idx]
+        path = img_lr['path']
+        img_lr=img_lr['img']
+        img_hr = img_hr['img']
 
         s = img_hr.shape[-2] // img_lr.shape[-2] # assume int scale
         if self.inp_size is None:
@@ -93,7 +96,8 @@ class SRImplicitPaired(Dataset):
             'inp': crop_lr,
             'coord': hr_coord,
             'cell': cell,
-            'gt': hr_rgb
+            'gt': hr_rgb,
+            'path': path
         }
 
 
@@ -127,6 +131,9 @@ class SRImplicitDownsampled(Dataset):
 
     def __getitem__(self, idx):
         img = self.dataset[idx]
+        path=img['path']
+        img=img['img']
+
         s = random.uniform(self.scale_min, self.scale_max)
 
         if self.inp_size is None:
@@ -192,7 +199,8 @@ class SRImplicitDownsampled(Dataset):
             'inp': crop_lr,
             'coord': hr_coord,
             'cell': cell,
-            'gt': hr_rgb
+            'gt': hr_rgb,
+            'path': path
         }
 
 
@@ -215,6 +223,10 @@ class SRImplicitUniformVaried(Dataset):
 
     def __getitem__(self, idx):
         img_lr, img_hr = self.dataset[idx]
+        path = img_lr['path']
+        img_lr=img_lr['img']
+        img_hr = img_hr['img']
+
         p = idx / (len(self.dataset) - 1)
         w_hr = round(self.size_min + (self.size_max - self.size_min) * p)
         img_hr = ants.resample_image(img_hr, (w_hr, w_hr, w_hr), use_voxels=True, interp_type=4)
@@ -246,5 +258,6 @@ class SRImplicitUniformVaried(Dataset):
             'inp': img_lr,
             'coord': hr_coord,
             'cell': cell,
-            'gt': hr_rgb
+            'gt': hr_rgb,
+            'path': path
         }

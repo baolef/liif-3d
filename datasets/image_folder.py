@@ -30,8 +30,10 @@ class ImageFolder(Dataset):
             filenames = filenames[:first_k]
 
         self.files = []
+        self.paths = []
         for filename in filenames:
             file = os.path.join(root_path, filename)
+            self.paths.append(file)
 
             if cache == 'none':
                 self.files.append(file)
@@ -60,19 +62,20 @@ class ImageFolder(Dataset):
 
     def __getitem__(self, idx):
         x = self.files[idx % len(self.files)]
+        path = self.paths[idx % len(self.files)]
 
         if self.cache == 'none':
-            return ants.image_read(x).iMath_normalize()
+            return {'img': ants.image_read(x).iMath_normalize(), 'path': path}
 
         elif self.cache == 'bin':
             with open(x, 'rb') as f:
                 x = pickle.load(f)
             x = np.ascontiguousarray(x.transpose(2, 0, 1))
             x = torch.from_numpy(x).float() / 255
-            return x
+            return {'img': x, 'path': path}
 
         elif self.cache == 'in_memory':
-            return x
+            return {'img': x, 'path': path}
 
 
 @register('paired-image-folders')

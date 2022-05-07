@@ -2,5 +2,5 @@
 #cnt=${#files}
 #path="logs/train_$((cnt+1)).log"
 #echo $path
-path="logs/$(date +"%Y-%m-%d_%T").log"
+path="logs/train_$(date +"%Y-%m-%d_%T").log"
 python train_liif.py --config configs/train-div2k/train_rdn-liif.yaml --gpu 1 > $path 2>&1 &
