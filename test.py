@@ -12,6 +12,8 @@ import datasets
 import models
 import utils
 
+import ants
+
 
 def batched_predict(model, inp, coord, cell, bsize):
     with torch.no_grad():
@@ -29,7 +31,7 @@ def batched_predict(model, inp, coord, cell, bsize):
 
 
 def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
-              verbose=False):
+              verbose=False, visualize=False):
     model.eval()
 
     if data_norm is None:
@@ -38,8 +40,8 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
             'gt': {'sub': [0], 'div': [1]}
         }
     t = data_norm['inp']
-    inp_sub = torch.FloatTensor(t['sub']).view(1, -1, 1, 1).cuda()
-    inp_div = torch.FloatTensor(t['div']).view(1, -1, 1, 1).cuda()
+    inp_sub = torch.FloatTensor(t['sub']).view(1, -1, 1, 1, 1).cuda()
+    inp_div = torch.FloatTensor(t['div']).view(1, -1, 1, 1, 1).cuda()
     t = data_norm['gt']
     gt_sub = torch.FloatTensor(t['sub']).view(1, 1, -1).cuda()
     gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).cuda()
@@ -73,21 +75,29 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
         pred.clamp_(0, 1)
 
         if eval_type is not None: # reshape for shaving-eval
-            ih, iw = batch['inp'].shape[-2:]
-            s = math.sqrt(batch['coord'].shape[1] / (ih * iw))
-            shape = [batch['inp'].shape[0], round(ih * s), round(iw * s), 3]
+            ih, iw, id = batch['inp'].shape[-3:]
+            s = round(math.pow(batch['coord'].shape[1] / (ih * iw * id), 1/3))
+            shape = [batch['inp'].shape[0], round(ih * s), round(iw * s), round(ih * s), 1]
             pred = pred.view(*shape) \
-                .permute(0, 3, 1, 2).contiguous()
+                .permute(0, 4, 1, 2, 3).contiguous()
             batch['gt'] = batch['gt'].view(*shape) \
-                .permute(0, 3, 1, 2).contiguous()
+                .permute(0, 4, 1, 2, 3).contiguous()
 
         res = metric_fn(pred, batch['gt'])
         val_res.add(res.item(), inp.shape[0])
+
+        if visualize:
+            to_nii(pred)
 
         if verbose:
             pbar.set_description('val {:.4f}'.format(val_res.item()))
 
     return val_res.item()
+
+
+def to_nii(inp):
+    inp=inp.cpu().numpy()
+
 
 
 if __name__ == '__main__':
@@ -105,8 +115,7 @@ if __name__ == '__main__':
     spec = config['test_dataset']
     dataset = datasets.make(spec['dataset'])
     dataset = datasets.make(spec['wrapper'], args={'dataset': dataset})
-    loader = DataLoader(dataset, batch_size=spec['batch_size'],
-        num_workers=8, pin_memory=True)
+    loader = DataLoader(dataset, batch_size=spec['batch_size'], pin_memory=True)
 
     model_spec = torch.load(args.model)['model']
     model = models.make(model_spec, load_sd=True).cuda()
@@ -115,5 +124,6 @@ if __name__ == '__main__':
         data_norm=config.get('data_norm'),
         eval_type=config.get('eval_type'),
         eval_bsize=config.get('eval_bsize'),
-        verbose=True)
+        verbose=True,
+        visualize=True)
     print('result: {:.4f}'.format(res))

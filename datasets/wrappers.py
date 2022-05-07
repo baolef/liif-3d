@@ -31,7 +31,8 @@ class SRImplicitPaired(Dataset):
         s = img_hr.shape[-2] // img_lr.shape[-2] # assume int scale
         if self.inp_size is None:
             h_lr, w_lr, d_lr = img_lr.shape
-            img_hr = img_hr[:h_lr * s, :w_lr * s, :d_lr*s]
+            # img_hr = img_hr[:h_lr * s, :w_lr * s, :d_lr*s]
+            img_hr = ants.crop_indices(img_hr, (0,0,0), (h_lr * s,w_lr * s,d_lr*s))
             crop_lr, crop_hr = img_lr, img_hr
         else:
             w_lr = self.inp_size

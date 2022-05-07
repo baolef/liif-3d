@@ -137,10 +137,10 @@ def calc_psnr(sr, hr, dataset=None, scale=1, rgb_range=1):
                 convert = diff.new_tensor(gray_coeffs).view(1, 3, 1, 1) / 256
                 diff = diff.mul(convert).sum(dim=1)
         elif dataset == 'div2k':
-            shave = scale + 6
+            shave = scale + 9
         else:
             raise NotImplementedError
-        valid = diff[..., shave:-shave, shave:-shave]
+        valid = diff[..., shave:-shave, shave:-shave, shave:-shave]
     else:
         valid = diff
     mse = valid.pow(2).mean()
