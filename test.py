@@ -133,6 +133,7 @@ if __name__ == '__main__':
     save_path=os.path.join('./results', args.model.split('/')[-2], args.model.split('/')[-1][:-len('.pth')], args.config.split('/')[-1][:-len('.yaml')])
     if not os.path.exists(save_path):
         os.makedirs(save_path)
+    print(save_path)
 
     res = eval_psnr(loader, model,
         data_norm=config.get('data_norm'),
