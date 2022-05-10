@@ -31,7 +31,7 @@ def batched_predict(model, inp, coord, cell, bsize):
 
 
 def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
-              verbose=False, visualize=False):
+              verbose=False, visualize=False, device='cuda'):
     model.eval()
 
     if data_norm is None:
@@ -142,7 +142,8 @@ if __name__ == '__main__':
         eval_type=config.get('eval_type'),
         eval_bsize=config.get('eval_bsize'),
         verbose=True,
-        visualize=True)
+        visualize=True,
+        device=device)
     print('result: {:.4f}'.format(res))
     with open(os.path.join(save_path,'result.txt'), 'w') as f:
         f.write('psnr: {:.4f}'.format(res))

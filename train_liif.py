@@ -45,8 +45,10 @@ def make_data_loader(spec, tag=''):
     dataset = datasets.make(spec['wrapper'], args={'dataset': dataset})
 
     log('{} dataset: size={}'.format(tag, len(dataset)))
+    x=dataset[0].items()
     for k, v in dataset[0].items():
-        log('  {}: shape={}'.format(k, tuple(v.shape)))
+        if k!='path':
+            log('  {}: shape={}'.format(k, tuple(v.shape)))
 
     loader = DataLoader(dataset, batch_size=spec['batch_size'],
         shuffle=(tag == 'train'), pin_memory=True)
@@ -101,7 +103,8 @@ def train(train_loader, model, optimizer):
 
     for batch in tqdm(train_loader, leave=False, desc='train'):
         for k, v in batch.items():
-            batch[k] = v.cuda()
+            if k!='path':
+                batch[k] = v.cuda()
 
         inp = (batch['inp'] - inp_sub) / inp_div
         pred = model(inp, batch['coord'], batch['cell'])
@@ -188,7 +191,8 @@ def main(config_, save_path):
             val_res = eval_psnr(val_loader, model_,
                 data_norm=config['data_norm'],
                 eval_type=config.get('eval_type'),
-                eval_bsize=config.get('eval_bsize'))
+                eval_bsize=config.get('eval_bsize'),
+                device='cuda')
 
             log_info.append('val: psnr={:.4f}'.format(val_res))
             writer.add_scalars('psnr', {'val': val_res}, epoch)
