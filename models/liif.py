@@ -13,11 +13,12 @@ import unfoldNd
 class LIIF(nn.Module):
 
     def __init__(self, encoder_spec, imnet_spec=None,
-                 local_ensemble=True, feat_unfold=True, cell_decode=True):
+                 local_ensemble=True, feat_unfold=True, cell_decode=True, device='cuda'):
         super().__init__()
         self.local_ensemble = local_ensemble
         self.feat_unfold = feat_unfold
         self.cell_decode = cell_decode
+        self.device = device
 
         self.encoder = models.make(encoder_spec)
 
@@ -62,7 +63,7 @@ class LIIF(nn.Module):
         ry = 2 / feat.shape[-2] / 2
         rz = 2 / feat.shape[-1] / 2
 
-        feat_coord = make_coord(feat.shape[-3:], flatten=False).cuda() \
+        feat_coord = make_coord(feat.shape[-3:], flatten=False).to(self.device) \
             .permute(3, 0, 1, 2) \
             .unsqueeze(0).expand(feat.shape[0], 3, *feat.shape[-3:])
 
@@ -76,9 +77,6 @@ class LIIF(nn.Module):
                     coord_[:, :, 1] += vy * ry + eps_shift
                     coord_[:, :, 2] += vz * rz + eps_shift
                     coord_.clamp_(-1 + 1e-6, 1 - 1e-6)
-                    t=F.grid_sample(
-                        feat, coord_.flip(-1).unsqueeze(1).unsqueeze(1),
-                        mode='nearest', align_corners=False)[:, :, 0, 0, :]
                     q_feat = F.grid_sample(
                         feat, coord_.flip(-1).unsqueeze(1).unsqueeze(1),
                         mode='nearest', align_corners=False)[:, :, 0, 0, :] \

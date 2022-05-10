@@ -40,11 +40,11 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
             'gt': {'sub': [0], 'div': [1]}
         }
     t = data_norm['inp']
-    inp_sub = torch.FloatTensor(t['sub']).view(1, -1, 1, 1, 1).cuda()
-    inp_div = torch.FloatTensor(t['div']).view(1, -1, 1, 1, 1).cuda()
+    inp_sub = torch.FloatTensor(t['sub']).view(1, -1, 1, 1, 1).to(device)
+    inp_div = torch.FloatTensor(t['div']).view(1, -1, 1, 1, 1).to(device)
     t = data_norm['gt']
-    gt_sub = torch.FloatTensor(t['sub']).view(1, 1, -1).cuda()
-    gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).cuda()
+    gt_sub = torch.FloatTensor(t['sub']).view(1, 1, -1).to(device)
+    gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).to(device)
 
     if eval_type is None:
         metric_fn = utils.calc_psnr
@@ -63,7 +63,7 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
     for batch in pbar:
         for k, v in batch.items():
             if k!='path':
-                batch[k] = v.cuda()
+                batch[k] = v.to(device)
 
         inp = (batch['inp'] - inp_sub) / inp_div
         if eval_bsize is None:
@@ -118,6 +118,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+    device='cpu' if (args.gpu=='-1' or args.gpu=='cpu') else 'cuda'
 
     with open(args.config, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
@@ -127,8 +128,9 @@ if __name__ == '__main__':
     dataset = datasets.make(spec['wrapper'], args={'dataset': dataset})
     loader = DataLoader(dataset, batch_size=spec['batch_size'], pin_memory=True)
 
-    model_spec = torch.load(args.model)['model']
-    model = models.make(model_spec, load_sd=True).cuda()
+    model_spec = torch.load(args.model, map_location=torch.device(device))['model']
+    model_spec['args']['device']=device
+    model = models.make(model_spec, load_sd=True).to(device)
 
     save_path=os.path.join('./results', args.model.split('/')[-2], args.model.split('/')[-1][:-len('.pth')], args.config.split('/')[-1][:-len('.yaml')])
     if not os.path.exists(save_path):
