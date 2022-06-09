@@ -15,7 +15,7 @@ import utils
 import ants
 
 
-def batched_predict(model, inp, coord, cell, bsize):
+def batched_predict(model, inp, coord, cell, bsize, half=False):
     with torch.no_grad():
         model.gen_feat(inp)
         n = coord.shape[1]
@@ -23,7 +23,7 @@ def batched_predict(model, inp, coord, cell, bsize):
         preds = []
         while ql < n:
             qr = min(ql + bsize, n)
-            pred = model.query_rgb(coord[:, ql: qr, :], cell[:, ql: qr, :])
+            pred = model.query_rgb(coord[:, ql: qr, :], cell[:, ql: qr, :], half)
             preds.append(pred)
             ql = qr
         pred = torch.cat(preds, dim=1)
@@ -31,7 +31,7 @@ def batched_predict(model, inp, coord, cell, bsize):
 
 
 def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
-              verbose=False, visualize=False, device='cuda'):
+              verbose=False, visualize=False, device='cuda', half=False):
     model.eval()
 
     if data_norm is None:
@@ -45,6 +45,12 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
     t = data_norm['gt']
     gt_sub = torch.FloatTensor(t['sub']).view(1, 1, -1).to(device)
     gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).to(device)
+
+    if half:
+        inp_sub=inp_sub.half()
+        inp_div=inp_div.half()
+        gt_sub=gt_sub.half()
+        gt_div=gt_div.half()
 
     if eval_type is None:
         metric_fn = utils.calc_psnr
@@ -63,7 +69,10 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
     for batch in pbar:
         for k, v in batch.items():
             if k!='path':
-                batch[k] = v.to(device)
+                if half:
+                    batch[k] = v.half().to(device)
+                else:
+                    batch[k] = v.to(device)
 
         inp = (batch['inp'] - inp_sub) / inp_div
         if eval_bsize is None:
@@ -71,7 +80,7 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
                 pred = model(inp, batch['coord'], batch['cell'])
         else:
             pred = batched_predict(model, inp,
-                batch['coord'], batch['cell'], eval_bsize)
+                batch['coord'], batch['cell'], eval_bsize, half)
         pred = pred * gt_div + gt_sub
         pred.clamp_(0, 1)
 
@@ -97,7 +106,7 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
 
 
 def to_nii(inps, paths, scale):
-    inps=inps.cpu().numpy()
+    inps=inps.to(device='cpu', dtype=torch.float).numpy()
     for i in range(len(paths)):
         inp = inps[i,0]
         path = paths[i]
@@ -111,10 +120,14 @@ def to_nii(inps, paths, scale):
 
 
 if __name__ == '__main__':
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.enabled = True
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--config')
     parser.add_argument('--model')
     parser.add_argument('--gpu', default='0')
+    parser.add_argument('--half', action='store_true')
     args = parser.parse_args()
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
@@ -132,6 +145,9 @@ if __name__ == '__main__':
     model_spec['args']['device']=device
     model = models.make(model_spec, load_sd=True).to(device)
 
+    if args.half:
+        model=model.half()
+
     save_path=os.path.join('./results', args.model.split('/')[-2], args.model.split('/')[-1][:-len('.pth')], args.config.split('/')[-1][:-len('.yaml')])
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -143,7 +159,8 @@ if __name__ == '__main__':
         eval_bsize=config.get('eval_bsize'),
         verbose=True,
         visualize=True,
-        device=device)
+        device=device,
+        half=args.half)
     print('result: {:.4f}'.format(res))
     with open(os.path.join(save_path,'result.txt'), 'w') as f:
         f.write('psnr: {:.4f}'.format(res))

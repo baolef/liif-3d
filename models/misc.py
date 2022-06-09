@@ -12,29 +12,41 @@ import unfoldNd
 @register('metasr')
 class MetaSR(nn.Module):
 
-    def __init__(self, encoder_spec, device='cuda'):
+    def __init__(self, encoder_spec, feat_unfold=True, device='cuda'):
         super().__init__()
 
         self.encoder = models.make(encoder_spec)
-        imnet_spec = {
-            'name': 'mlp',
-            'args': {
-                'in_dim': 4,
-                'out_dim': self.encoder.out_dim * 27 * 1,
-                'hidden_list': [256, 256, 256, 256]
+        if feat_unfold:
+            imnet_spec = {
+                'name': 'mlp',
+                'args': {
+                    'in_dim': 4,
+                    'out_dim': self.encoder.out_dim * 27 * 1,
+                    'hidden_list': [256, 256, 256, 256]
+                }
             }
-        }
+        else:
+            imnet_spec = {
+                'name': 'mlp',
+                'args': {
+                    'in_dim': 4,
+                    'out_dim': self.encoder.out_dim * 1,
+                    'hidden_list': [256, 256, 256, 256]
+                }
+            }
         self.imnet = models.make(imnet_spec)
         self.device=device
+        self.feat_unfold = feat_unfold
 
     def gen_feat(self, inp):
         self.feat = self.encoder(inp)
         return self.feat
 
-    def query_rgb(self, coord, cell=None):
+    def query_rgb(self, coord, cell=None, half=False):
         feat = self.feat
-        feat = unfoldNd.unfoldNd(feat, 3, padding=1).view(
-            feat.shape[0], feat.shape[1] * 27, feat.shape[2], feat.shape[3], feat.shape[4])
+        if self.feat_unfold:
+            feat = unfoldNd.unfoldNd(feat, 3, padding=1).view(
+                feat.shape[0], feat.shape[1] * 27, feat.shape[2], feat.shape[3], feat.shape[4])
 
         feat_coord = make_coord(feat.shape[-3:], flatten=False).to(self.device)
         feat_coord[:, :, 0] -= (2 / feat.shape[-3]) / 2
@@ -42,6 +54,9 @@ class MetaSR(nn.Module):
         feat_coord[:, :, 3] -= (2 / feat.shape[-1]) / 2
         feat_coord = feat_coord.permute(3, 0, 1, 2) \
             .unsqueeze(0).expand(feat.shape[0], 3, *feat.shape[-3:])
+
+        if half:
+            feat_coord=feat_coord.half()
 
         coord_ = coord.clone()
         coord_[:, :, 0] -= cell[:, :, 0] / 2

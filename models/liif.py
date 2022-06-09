@@ -37,7 +37,7 @@ class LIIF(nn.Module):
         self.feat = self.encoder(inp)
         return self.feat
 
-    def query_rgb(self, coord, cell=None):
+    def query_rgb(self, coord, cell=None, half=False):
         feat = self.feat
 
         if self.imnet is None:
@@ -66,6 +66,9 @@ class LIIF(nn.Module):
         feat_coord = make_coord(feat.shape[-3:], flatten=False).to(self.device) \
             .permute(3, 0, 1, 2) \
             .unsqueeze(0).expand(feat.shape[0], 3, *feat.shape[-3:])
+
+        if half:
+            feat_coord=feat_coord.half()
 
         preds = []
         areas = []
