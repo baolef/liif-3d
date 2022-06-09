@@ -1,4 +1,4 @@
-# LIIF
+# LIIF-3d
 
 This repository contains the official implementation for LIIF introduced in the following paper:
 
