@@ -1,5 +1,5 @@
-echo 'div2k-x2' &&
-python test.py --config ./configs/test/test-div2k-2.yaml --model $1 --gpu $2 &&
+#echo 'div2k-x2' &&
+#python test.py --config ./configs/test/test-div2k-2.yaml --model $1 --gpu $2 &&
 echo 'div2k-x3' &&
 python test.py --config ./configs/test/test-div2k-3.yaml --model $1 --gpu $2 &&
 echo 'div2k-x4' &&

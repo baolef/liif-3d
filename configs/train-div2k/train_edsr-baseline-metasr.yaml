@@ -40,6 +40,7 @@ model:
       name: edsr-baseline
       args:
         no_upsampling: true
+    feat_unfold: true
 
 optimizer:
   name: adam
@@ -52,3 +53,4 @@ multi_step_lr:
 
 epoch_val: 1
 epoch_save: 10
+precision: full

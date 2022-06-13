@@ -27,6 +27,7 @@ import os
 import yaml
 import torch
 import torch.nn as nn
+from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import MultiStepLR
@@ -123,8 +124,46 @@ def train(train_loader, model, optimizer):
     return train_loss.item()
 
 
+def train_mix(train_loader, model, optimizer, scaler):
+    model.train()
+    loss_fn = nn.L1Loss()
+    train_loss = utils.Averager()
+
+    data_norm = config['data_norm']
+    t = data_norm['inp']
+    inp_sub = torch.FloatTensor(t['sub']).view(1, -1, 1, 1, 1).cuda()
+    inp_div = torch.FloatTensor(t['div']).view(1, -1, 1, 1, 1).cuda()
+    t = data_norm['gt']
+    gt_sub = torch.FloatTensor(t['sub']).view(1, 1, -1).cuda()
+    gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).cuda()
+
+    for batch in tqdm(train_loader, leave=False, desc='train'):
+        for k, v in batch.items():
+            if k!='path':
+                batch[k] = v.cuda()
+
+        inp = (batch['inp'] - inp_sub) / inp_div
+        with autocast():
+            pred = model(inp, batch['coord'], batch['cell'])
+
+            gt = (batch['gt'] - gt_sub) / gt_div
+            loss = loss_fn(pred, gt)
+
+        train_loss.add(loss.item())
+
+        optimizer.zero_grad()
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+
+        pred = None; loss = None
+
+    return train_loss.item()
+
+
 def main(config_, save_path):
     global config, log, writer
+    precision = config['precision']
     config = config_
     log, writer = utils.set_save_path(save_path)
     with open(os.path.join(save_path, 'config.yaml'), 'w') as f:
@@ -138,6 +177,7 @@ def main(config_, save_path):
         }
 
     model, optimizer, epoch_start, lr_scheduler = prepare_training()
+    scaler = GradScaler()
 
     n_gpus = len(os.environ['CUDA_VISIBLE_DEVICES'].split(','))
     if n_gpus > 1:
@@ -156,7 +196,10 @@ def main(config_, save_path):
 
         writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
 
-        train_loss = train(train_loader, model, optimizer)
+        if precision=='mixed':
+            train_loss = train_mix(train_loader, model, optimizer, scaler)
+        else:
+            train_loss = train(train_loader, model, optimizer)
         if lr_scheduler is not None:
             lr_scheduler.step()
 
@@ -209,6 +252,9 @@ def main(config_, save_path):
         log(', '.join(log_info))
         writer.flush()
 
+    log('max_memory_allocated='+str(torch.cuda.max_memory_allocated()))
+    log('max_memory_reserved=' + str(torch.cuda.max_memory_reserved()))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -229,6 +275,13 @@ if __name__ == '__main__':
         save_name = '_' + args.config.split('/')[-1][:-len('.yaml')]
     if args.tag is not None:
         save_name += '_' + args.tag
+    if config['model']['args']['encoder_spec']['name']=='rdn':
+        save_name = save_name.replace('rdn', 'rdn'+config['model']['args']['encoder_spec']['args'].get('RDNconfig','A'))
+    if not config['model']['args']['feat_unfold']:
+        save_name += '-u'
+    if config['precision']:
+        save_name += '-'+config['precision']
+
     save_path = os.path.join('./save', save_name)
 
     main(config, save_path)

@@ -3,4 +3,4 @@
 #path="logs/train_$((cnt+1)).log"
 #echo $path
 path="logs/train_$(date +"%Y-%m-%d_%T").log"
-python train_liif.py --config configs/train-div2k/train_rdn-metasr-u.yaml --gpu 1 > $path 2>&1 &
+python train_liif.py --config configs/train-div2k/train_edsr-baseline-metasr.yaml --gpu 0 > $path 2>&1 &

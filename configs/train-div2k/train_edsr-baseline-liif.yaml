@@ -45,6 +45,7 @@ model:
       args:
         out_dim: 1
         hidden_list: [256, 256, 256, 256]
+    feat_unfold: true
 
 optimizer:
   name: adam
@@ -57,3 +58,4 @@ multi_step_lr:
 
 epoch_val: 1
 epoch_save: 10
+precision: full
