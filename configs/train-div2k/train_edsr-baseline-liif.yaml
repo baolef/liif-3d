@@ -58,4 +58,4 @@ multi_step_lr:
 
 epoch_val: 1
 epoch_save: 10
-precision: full
+precision: half

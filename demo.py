@@ -26,7 +26,9 @@ if __name__ == '__main__':
     # img = transforms.ToTensor()(Image.open(args.input).convert('RGB'))
 
     img = ants.image_read(args.input).iMath_normalize()
-    inp=torch.Tensor(ants.image_read(args.input).numpy(True).transpose(3, 0, 1, 2))
+    inp=torch.Tensor(img.numpy(True).transpose(3, 0, 1, 2))
+
+    inp=inp[:,:64,:64,:64]
 
     model = models.make(torch.load(args.model)['model'], load_sd=True).cuda()
 
@@ -42,7 +44,7 @@ if __name__ == '__main__':
     pred = (pred * 0.5 + 0.5).view(h, w, d).cpu().numpy()
     print(pred.min(),pred.max())
     # transforms.ToPILImage()(pred).save(args.output)
-    pred_img = ants.from_numpy(pred,origin=img.origin, spacing=tuple([space/8 for space in img.spacing]))
+    pred_img = ants.from_numpy(pred,origin=img.origin, spacing=tuple(img.spacing), direction=img.direction)
     print(pred_img.min(),pred_img.max())
-    pred_img.iMath_normalize()
+    # pred_img.iMath_normalize()
     ants.image_write(pred_img,args.output)

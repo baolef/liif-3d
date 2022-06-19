@@ -84,9 +84,48 @@ def prepare_training():
             lr_scheduler = None
         else:
             lr_scheduler = MultiStepLR(optimizer, **config['multi_step_lr'])
+        if config['precision']=='half':
+            model=model.half()
 
     log('model: #params={}'.format(utils.compute_num_params(model, text=True)))
     return model, optimizer, epoch_start, lr_scheduler
+
+
+def train_half(train_loader, model, optimizer):
+    model.train()
+    loss_fn = nn.L1Loss()
+    train_loss = utils.Averager()
+
+    data_norm = config['data_norm']
+    t = data_norm['inp']
+    inp_sub = torch.FloatTensor(t['sub']).view(1, -1, 1, 1, 1).half().cuda()
+    inp_div = torch.FloatTensor(t['div']).view(1, -1, 1, 1, 1).half().cuda()
+    t = data_norm['gt']
+    gt_sub = torch.FloatTensor(t['sub']).view(1, 1, -1).half().cuda()
+    gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).half().cuda()
+
+    for batch in tqdm(train_loader, leave=False, desc='train'):
+        for k, v in batch.items():
+            if k!='path':
+                batch[k] = v.half().cuda()
+
+        inp = (batch['inp'] - inp_sub) / inp_div
+        pred = model(inp, batch['coord'], batch['cell'])
+
+        gt = (batch['gt'] - gt_sub) / gt_div
+        loss = loss_fn(pred, gt)
+
+        train_loss.add(loss.item())
+
+        optimizer.zero_grad()
+        loss.backward()
+        model.float()
+        optimizer.step()
+        model.half()
+
+        pred = None; loss = None
+
+    return train_loss.item()
 
 
 def train(train_loader, model, optimizer):
@@ -198,6 +237,8 @@ def main(config_, save_path):
 
         if precision=='mixed':
             train_loss = train_mix(train_loader, model, optimizer, scaler)
+        elif precision=='half':
+            train_loss = train_half(train_loader, model, optimizer)
         else:
             train_loss = train(train_loader, model, optimizer)
         if lr_scheduler is not None:
@@ -235,7 +276,8 @@ def main(config_, save_path):
                 data_norm=config['data_norm'],
                 eval_type=config.get('eval_type'),
                 eval_bsize=config.get('eval_bsize'),
-                device='cuda')
+                device='cuda',
+                half=precision=='half')
 
             log_info.append('val: psnr={:.4f}'.format(val_res))
             writer.add_scalars('psnr', {'val': val_res}, epoch)

@@ -105,8 +105,9 @@ class LIIF(nn.Module):
                     pred = self.imnet(inp.view(bs * q, -1)).view(bs, q, -1)
                     preds.append(pred)
 
+                    rel_coord=rel_coord.float()
                     area = torch.abs(rel_coord[:, :, 0] * rel_coord[:, :, 1] * rel_coord[:, :, 2])
-                    areas.append(area + 1e-9)
+                    areas.append(area + (1e-6 if half else 1e-9))
 
         tot_area = torch.stack(areas).sum(dim=0)
         if self.local_ensemble:
@@ -114,9 +115,12 @@ class LIIF(nn.Module):
             t = areas[1]; areas[1] = areas[2]; areas[2] = t
         ret = 0
         for pred, area in zip(preds, areas):
-            ret = ret + pred * (area / tot_area).unsqueeze(-1)
+            if half:
+                ret = ret + pred * ((area / tot_area).half()).unsqueeze(-1)
+            else:
+                ret = ret + pred * (area / tot_area).unsqueeze(-1)
         return ret
 
     def forward(self, inp, coord, cell):
         self.gen_feat(inp)
-        return self.query_rgb(coord, cell)
+        return self.query_rgb(coord, cell, inp.dtype == torch.float16)

@@ -88,4 +88,4 @@ class MetaSR(nn.Module):
 
     def forward(self, inp, coord, cell):
         self.gen_feat(inp)
-        return self.query_rgb(coord, cell)
+        return self.query_rgb(coord, cell, inp.dtype == torch.float16)

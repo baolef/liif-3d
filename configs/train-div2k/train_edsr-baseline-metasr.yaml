@@ -4,7 +4,7 @@ train_dataset:
     args:
       root_path: /data/baole/liif/oasis/train_HR
       repeat: 1
-      cache: in_memory
+      cache: none
   wrapper:
     name: sr-implicit-downsampled
     args:
@@ -20,7 +20,7 @@ val_dataset:
     args:
       root_path: /data/baole/liif/oasis/valid_HR
       repeat: 1
-      cache: in_memory
+      cache: none
   wrapper:
     name: sr-implicit-downsampled
     args:
@@ -53,4 +53,4 @@ multi_step_lr:
 
 epoch_val: 1
 epoch_save: 10
-precision: full
+precision: half
