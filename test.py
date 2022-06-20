@@ -30,11 +30,12 @@ def batched_predict(model, inp, coord, cell, bsize, half=False):
     return pred
 
 
-def block_predict(model, inp, coord, cell, bsize, ratio, scale, gt_div, gt_sub, batch, half=False, device='cuda'):
+def block_predict(model, inp, bsize, ratio, scale, half=False, device='cuda'):
     with torch.no_grad():
+        if isinstance(scale, int):
+            scale=[scale,scale,scale]
         ih, iw, id = inp.shape[-3:]
-        s = round(math.pow(coord.shape[1] / (ih * iw * id), 1 / 3))
-        shape = [inp.shape[0], 1, round(ih * s), round(iw * s), round(ih * s)]
+        shape = [inp.shape[0], 1, round(ih * scale[0]), round(iw * scale[1]), round(id * scale[2])]
         output = torch.zeros(shape).to(device)
         cnt = torch.zeros(shape).to(device)
         blk_half_shape = (int(inp.shape[2] / ratio / 2), int(inp.shape[3] / ratio / 2), int(inp.shape[4] / ratio / 2))
@@ -49,12 +50,12 @@ def block_predict(model, inp, coord, cell, bsize, ratio, scale, gt_div, gt_sub, 
                     # model.gen_feat(blk)
 
                     # prepare blk_coords and blk_cell
-                    blk_coord = utils.make_coord((blk.shape[2] * scale, blk.shape[3] * scale, blk.shape[3] * scale))
+                    blk_coord = utils.make_coord((blk.shape[2] * scale[0], blk.shape[3] * scale[1], blk.shape[3] * scale[2]))
                     blk_coord = blk_coord.repeat(len(blk), 1, 1).to(device)
                     blk_cell = torch.ones_like(blk_coord)
-                    blk_cell[:, :, 0] *= 2 / (blk.shape[2] * scale)
-                    blk_cell[:, :, 1] *= 2 / (blk.shape[3] * scale)
-                    blk_cell[:, :, 2] *= 2 / (blk.shape[4] * scale)
+                    blk_cell[:, :, 0] *= 2 / (blk.shape[2] * scale[0])
+                    blk_cell[:, :, 1] *= 2 / (blk.shape[3] * scale[1])
+                    blk_cell[:, :, 2] *= 2 / (blk.shape[4] * scale[2])
                     blk_cell = blk_cell.repeat(len(blk), 1, 1).to(device)
 
                     # n = blk_coord.shape[1]
@@ -71,16 +72,16 @@ def block_predict(model, inp, coord, cell, bsize, ratio, scale, gt_div, gt_sub, 
 
                     # convert pred to 3d
                     ih, iw, id = blk.shape[-3:]
-                    shape = [inp.shape[0], round(ih * scale), round(iw * scale), round(id * scale), 1]
+                    shape = [inp.shape[0], round(ih * scale[0]), round(iw * scale[1]), round(id * scale[2]), 1]
                     pred = pred.view(*shape).permute(0, 4, 1, 2, 3).contiguous()
 
                     # putting pred to output
-                    output[:, :, scale * x:scale * min(x + blk_half_shape[0] * 2, inp.shape[2]),
-                    scale * y:scale * min(y + blk_half_shape[1] * 2, inp.shape[3]),
-                    scale * z:scale * min(z + blk_half_shape[2] * 2, inp.shape[4])] += pred
-                    cnt[:, :, scale * x:scale * min(x + blk_half_shape[0] * 2, inp.shape[2]),
-                    scale * y:scale * min(y + blk_half_shape[1] * 2, inp.shape[3]),
-                    scale * z:scale * min(z + blk_half_shape[2] * 2, inp.shape[4])] += 1
+                    output[:, :, round(scale[0] * x):round(scale[0] * min(x + blk_half_shape[0] * 2, inp.shape[2])),
+                    round(scale[1] * y):round(scale[1] * min(y + blk_half_shape[1] * 2, inp.shape[3])),
+                    round(scale[2] * z):round(scale[2] * min(z + blk_half_shape[2] * 2, inp.shape[4]))] += pred
+                    cnt[:, :, round(scale[0] * x):round(scale[0] * min(x + blk_half_shape[0] * 2, inp.shape[2])),
+                    round(scale[1] * y):round(scale[1] * min(y + blk_half_shape[1] * 2, inp.shape[3])),
+                    round(scale[2] * z):round(scale[2] * min(z + blk_half_shape[2] * 2, inp.shape[4]))] += 1
 
     return output / cnt
 
@@ -139,8 +140,7 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
                                        batch['coord'], batch['cell'], eval_bsize, half)
         else:
             scale = int(eval_type.split('-')[1])
-            pred = block_predict(model, inp,
-                                 batch['coord'], batch['cell'], eval_bsize, ratio, scale, gt_div, gt_sub, batch, half)
+            pred = block_predict(model, inp, eval_bsize, ratio, scale, half)
 
         pred = pred * gt_div + gt_sub
         pred.clamp_(0, 1)
@@ -148,7 +148,7 @@ def eval_psnr(loader, model, data_norm=None, eval_type=None, eval_bsize=None,
         if eval_type is not None:  # reshape for shaving-eval
             ih, iw, id = batch['inp'].shape[-3:]
             s = round(math.pow(batch['coord'].shape[1] / (ih * iw * id), 1 / 3))
-            shape = [batch['inp'].shape[0], round(ih * s), round(iw * s), round(ih * s), 1]
+            shape = [batch['inp'].shape[0], round(ih * s), round(iw * s), round(id * s), 1]
             pred = pred.view(*shape) \
                 .permute(0, 4, 1, 2, 3).contiguous()
             batch['gt'] = batch['gt'].view(*shape) \
@@ -212,8 +212,8 @@ if __name__ == '__main__':
 
     save_path = os.path.join('./results', args.model.split('/')[-2], args.model.split('/')[-1][:-len('.pth')],
                              args.config.split('/')[-1][:-len('.yaml')])
-    if args.ratio>1:
-        save_path += '-ratio-' + str(args.ratio)
+    # if args.ratio>1:
+    #     save_path += '-ratio-' + str(args.ratio)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     print(save_path)
