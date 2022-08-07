@@ -4,5 +4,5 @@ python demo.py \
 --model ./save/_train_rdnB-liif-mixed/epoch-last.pth \
 --resolution 512,512,512 \
 --ratio 4 \
---gpu 0 \
+--gpu 3 \
 > $path 2>&1 &
